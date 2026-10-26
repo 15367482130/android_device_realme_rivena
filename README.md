@@ -4,6 +4,7 @@
 - https://github.com/15367482130/android_device_realme_rivena （默认分支 lineage-24.0）
 - https://github.com/15367482130/android_device_oppo_sm8250-common （默认分支 lineage-24.0）
 - https://github.com/15367482130/android_hardware_oplus （lineage-24.0 = 上游 24.0 + 16 个 rivena 定制提交）
+- https://github.com/15367482130/android_kernel_realme_sm8250 （lineage-24.0，与 23.2 同 commit）
 
 给 **真我 GT 大师探索版（RMX3366 / rivena）** 做的 `lineage-24.0` 设备树，含两棵树 + 8 个补丁。
 **不是凭空写的**：逐条对照了官方 `LineageOS/android_device_oneplus_sm8250-common` 从
