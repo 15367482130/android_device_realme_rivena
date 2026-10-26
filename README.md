@@ -19,8 +19,9 @@ The sibling tree [`LineageOS/android_device_oneplus_lemonade`](https://github.co
 has byte-identical content on `lineage-23.2` and `lineage-24.0` (same commit). Same story here:
 version-specific code lives in the shared `sm8250-common` tree, not in the per-device tree.
 
-See [PORTING-24.md](PORTING-24.md) for the current status, remaining blockers and the
-recommended build/verify order.
+See [PORTING-24.md](PORTING-24.md) for the status and build order, and
+[WHAT-ELSE.md](WHAT-ELSE.md) for the per-repo gap analysis with evidence
+(kernel: 0 upstream commits, hardware/oplus: 66 commits / 123 files, etc.).
 
 ## Building
 
