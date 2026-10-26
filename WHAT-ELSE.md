@@ -7,14 +7,14 @@
 | 机型树 `device/realme/rivena` | ✅ 已有 24.0 分支 | 无（代码与 23.2 一致） | 0 |
 | 公共树 `device/oppo/sm8250-common` | ✅ 7 个改动已提交 | 无（编译后可能补 sepolicy） | 0 |
 | 内核 `kernel/oppo/sm8250` | ✅ 4.19.325 | **无**：上游同平台 23.2→24.0 提交数 **0** | 0 |
-| `hardware/oplus` | ⚠️ fork 停在 23.2 | **换上游 24.0**（66 提交 / 123 文件） | 换源即可起编 |
+| `hardware/oplus` | ✅ 已有 24.0（上游 24.0 + 16 个 rivena 定制提交） | 无 | 0 |
 | `vendor/realme/rivena` | ⚠️ 只有 23.2 | blob 无需换版本，先复用 | 0（WFD 可能补 fixup） |
 | `vendor/oppo/sm8250-common` | ✅ 已有 24.0（2026-10-22） | 无 | 0 |
 | `vendor/oplus/camera` | ⚠️ 只有 23.1 | 先试，编译/运行崩了再处理 | 未知 |
 | sepolicy | ⚠️ 未知 | 只能靠编译日志逐条补 | 最花时间 |
 | local_manifest | ✅ 已写 `local_manifests/rivena-24.0.xml` | — | 0 |
 
-**一句话：真正卡住的只剩 `hardware/oplus` 和 sepolicy。**
+**一句话：仓库层面已经齐了，剩下的是 sepolicy 和真机验证——这两件只能靠编译日志和真机，写不出来。**
 
 ## 证据
 
@@ -32,22 +32,28 @@ hardware/oplus（LineageOS/android_hardware_oplus）
 （`aidl/livedisplay/Android.bp`），所以设备树里的
 `soong_config_set_bool(OPLUS_LINEAGE_LIVEDISPLAY_HAL,ENABLE_SE,false)` 不会报未知命名空间 —— 换源是安全的。
 
-## 1. hardware/oplus 怎么处理
+## 1. hardware/oplus 已经合并好
 
-**先换上游**（`rivena-24.0.xml` 里已经这么写了）：直接 `LineageOS/android_hardware_oplus` 的 `lineage-24.0`。
-rivena 现在用的 fork 比上游 23.2 多了 55 处定制（vibrator 波形、触摸轮询率、`oplus-fwk` 里额外的 app/bluetooth/content 类），
-这些是**调优和功能补丁**，不是编译必需——先让系统编出来、开起来，再把这些逐个搬回去：
+fork 相对上游 23.2 只有 **16 个提交**（sensors AIDL 多 HAL、振动波形、oplus-fwk 相机类、Doze 传感器 overlay），
+共同祖先很近（2026-06-23），所以直接 rebase 到上游 24.0 **零冲突**：
 
-```bash
-# 把 fork 的定制搬到 24.0 上（在源码树里操作）
-cd hardware/oplus
-git remote add mine https://github.com/RMX3366-Development/android_hardware_oplus
-git fetch mine lineage-23.2
-git diff HEAD..mine/lineage-23.2 -- aidl/vibrator aidl/touch oplus-fwk > /tmp/rivena-hw-tweaks.patch
-git apply --3way /tmp/rivena-hw-tweaks.patch   # 冲突就按 24.0 的接口改
+```
+lineage-24.0 = LineageOS/android_hardware_oplus lineage-24.0 (66 提交)
+             + rivena 16 个定制提交
+已推送：https://github.com/15367482130/android_hardware_oplus (lineage-24.0)
 ```
 
-搬完再 `mka` 一遍，触摸/振动这类功能才有得测。
+一个坑记下来：GitHub 拒收带 `.github/workflows` 的推送（token 缺 `workflow` scope），
+所以推送前把该目录从历史里剔了（`git filter-branch --index-filter 'git rm -r --cached --ignore-unmatch .github'`），
+CI 配置和编译无关，不影响功能。代价是这条分支的 commit hash 与上游不再一致。
+
+以后同步上游：
+
+```bash
+git fetch up lineage-24.0 && git rebase up/lineage-24.0   # 16 个提交会浮在最上面
+```
+
+如果怀疑是定制提交引入的编译错误，先把清单切回纯上游 24.0（`rivena-24.0.xml` 里有注释好的备选行）。
 
 ## 2. vendor/realme/rivena 为什么可以先不重抽
 
@@ -70,7 +76,12 @@ readelf -d out/target/product/rivena/vendor/lib64/libwfdservice.so | grep NEEDED
                     'android.media.audio.common.types-V5-cpp.so'),
 ```
 
-## 3. sepolicy：只能打日志补
+## 3. sepolicy：只能打日志补（规则该放哪）
+
+**不要**在 `device/qcom/sepolicy_vndr` 里改（那是平台策略，跟上游同步时必冲突）。
+rivena 的设备规则实际上都在 **`hardware/oplus/sepolicy/qti/vendor/`** —— 那 16 个定制提交里
+就有一条 `sepolicy: qti: Label sensors AIDL multihal`，说明维护者就是在这里加规则的。
+新增规则放这里，跟着 hardware/oplus 的 24.0 分支一起走。
 
 老 vendor + 新框架，`neverallow` 是最常见的拦路虎。典型会撞到的几类：
 
@@ -80,8 +91,17 @@ readelf -d out/target/product/rivena/vendor/lib64/libwfdservice.so | grep NEEDED
 - 新增的 `vendor_*_service` 没有 domain
 
 补法只有一个：编译报 `neverallow` 的那条规则，照它给的 allow 建议（日志里会写 "The following accesses
-were denied" / "neverallow ... on line NNN"）往 `device/oppo/sm8250-common/sepolicy/vendor/` 里加，
+were denied" / "neverallow ... on line NNN"）往 `hardware/oplus/sepolicy/qti/vendor/` 里加，
 **不要**图省事开 `permissive` 或 `SELINUX_IGNORE_NEVERALLOWS`，那样即使开机也会在真机上出各种权限崩溃。
+
+用 `tools/avc2sepolicy.py` 可以从日志直接生成规则草稿：
+
+```bash
+tools/avc2sepolicy.py out/build-sepolicy-1026-1030.log -o rules.te
+```
+
+它会**分开**列 neverallow 违规和 avc 拒绝 —— 前者加 allow 是无效的（核心策略的硬约束，得改访问路径或建 vendor domain），
+后者才是能直接补的。
 
 ## 4. 第一次编译大概率撞到的错误（按出现顺序）
 
@@ -104,3 +124,18 @@ were denied" / "neverallow ... on line NNN"）往 `device/oppo/sm8250-common/sep
 | 真机功能对齐（相机、指纹、VOOC、待机） | 再一到两周 |
 
 所以：**"能编译出 zip" 是几小时到几天的事，"能当日常机用" 是几周的事**。这个预期先摆清楚。
+
+## 6. 工具（本目录 tools/）
+
+| 工具 | 用途 |
+|---|---|
+| `analyze-build-log.sh` | 把 `mka` 日志按 soong 配置 / 缺模块 / sepolicy / vintf / native / link 分类，每类给前 5 条 |
+| `avc2sepolicy.py` | 从日志提取 neverallow 与 avc 拒绝，去重计数，生成 `allow` 规则草稿 |
+
+用法：
+
+```bash
+./build-24.sh --stage sepolicy 2>&1 | tee /tmp/sep.log
+tools/analyze-build-log.sh /tmp/sep.log
+tools/avc2sepolicy.py /tmp/sep.log -o /tmp/rules.te
+```
