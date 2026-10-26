@@ -6,7 +6,7 @@
 |---|---|---|---|
 | 机型树 `device/realme/rivena` | ✅ 已有 24.0 分支 | 无（代码与 23.2 一致） | 0 |
 | 公共树 `device/oppo/sm8250-common` | ✅ 7 个改动已提交 | 无（编译后可能补 sepolicy） | 0 |
-| 内核 `kernel/oppo/sm8250` | ✅ 4.19.325 | **无**：上游同平台 23.2→24.0 提交数 **0** | 0 |
+| 内核 `kernel/oppo/sm8250` | ✅ 4.19.325，已有 `lineage-24.0` 分支 | 无：分支与 23.2 同 commit | 0 |
 | `hardware/oplus` | ✅ 已有 24.0（上游 24.0 + 16 个 rivena 定制提交） | 无 | 0 |
 | `vendor/realme/rivena` | ⚠️ 只有 23.2 | blob 无需换版本，先复用 | 0（WFD 可能补 fixup） |
 | `vendor/oppo/sm8250-common` | ✅ 已有 24.0（2026-10-22） | 无 | 0 |
@@ -20,7 +20,10 @@
 
 ```
 内核（LineageOS/android_kernel_oneplus_sm8250）
-  compare lineage-23.2...lineage-24.0 → commits: 0, files: 0        ← 不用动
+  compare lineage-23.2...lineage-24.0 → commits: 0, files: 0
+  tree sha：23.2 = 98a7970…，24.0 = 98a7970…  完全一致        ← 这一层不需要改
+  → rivena 内核同样做法：lineage-24.0 指向 3aa8183（= 23.2 的 commit），
+    仓库 https://github.com/15367482130/android_kernel_realme_sm8250
 
 hardware/oplus（LineageOS/android_hardware_oplus）
   compare lineage-23.2...lineage-24.0 → commits: 66, files: 123     ← 必须跟
